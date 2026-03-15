@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:4567/api";
+const API_BASE = "/api";
 
 const get = (path) =>
   fetch(`${API_BASE}${path}`).then((res) => {
@@ -11,12 +11,35 @@ export const getSkills    = () => get("/skills");
 export const getInterests = () => get("/interests");
 export const getCareers   = () => get("/careers");
 
-/**
- * Fetch career_requirements for every career.
- * Your CareerController needs a GET /api/careers/:id/requirements route.
- * If it doesn't exist yet (404), we return [] and the matcher falls back
- * to keyword scoring automatically.
- */
+export const createStudent = (name) =>
+  fetch(`${API_BASE}/students`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
+export const createCareer = (title, category, description) =>
+  fetch(`${API_BASE}/careers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, category, description }),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
+export const deleteCareer = (id) =>
+  fetch(`${API_BASE}/careers/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
 export const getAllRequirements = async (careers) => {
   const results = [];
   for (const career of careers) {
@@ -32,18 +55,6 @@ export const getAllRequirements = async (careers) => {
   return results;
 };
 
-/**
- * Client-side scoring algorithm.
- *
- * Scoring rules:
- *   Skill match    → weight × 2 pts
- *   Interest match → weight × 1 pt
- *   Work-style bonus → +1 pt if career category/title matches style keyword
- *
- * If career_requirements table has data those links are used.
- * If the table is empty / endpoint missing we fall back to fuzzy
- * keyword matching between skill/interest names and career title+category.
- */
 export const scoreAndRankCareers = (
   careers,
   requirements,
@@ -53,7 +64,6 @@ export const scoreAndRankCareers = (
   selectedInterestIds,
   workStyle
 ) => {
-  // Build lookup maps
   const skillNameById    = Object.fromEntries(allSkills.map((s) => [s.skillId, s.skillName]));
   const interestNameById = Object.fromEntries(allInterests.map((i) => [i.interestId, i.interestName]));
 
@@ -64,7 +74,6 @@ export const scoreAndRankCareers = (
     leadership: ["Manager", "Lead", "Architect", "Director", "CTO", "Principal"],
   };
 
-  // Build synthetic requirements if table is empty
   let reqs = requirements;
   if (reqs.length === 0) {
     reqs = [];
@@ -105,7 +114,6 @@ export const scoreAndRankCareers = (
         }
       });
 
-      // Work style bonus
       if (workStyle && styleKeywords[workStyle]) {
         const haystack = `${career.title} ${career.category}`;
         if (styleKeywords[workStyle].some((kw) => haystack.includes(kw))) {

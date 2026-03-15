@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import {
+  getStudents,
   getSkills,
   getInterests,
   getCareers,
   getAllRequirements,
   scoreAndRankCareers,
+  createStudent,
+  createCareer,
+  deleteCareer,
 } from "../api";
 import CareerCard from "../components/CareerCard";
 
@@ -15,7 +19,13 @@ const WORK_STYLES = [
   { key: "leadership", emoji: "🎯", label: "Leadership"  },
 ];
 
+const ADMIN_ID = -10;
+
 function MatchPage() {
+  const [students,  setStudents]  = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState("");
+  const [newStudentName,  setNewStudentName]  = useState("");
+
   const [skills,    setSkills]    = useState([]);
   const [interests, setInterests] = useState([]);
   const [careers,   setCareers]   = useState([]);
@@ -30,12 +40,23 @@ function MatchPage() {
   const [running,  setRunning]  = useState(false);
   const [error,    setError]    = useState(null);
 
+  // Admin — add career
+  const [newCareerTitle, setNewCareerTitle]       = useState("");
+  const [newCareerCategory, setNewCareerCategory] = useState("");
+  const [newCareerDesc, setNewCareerDesc]         = useState("");
+
+  // Admin — delete career
+  const [deleteCareerSelected, setDeleteCareerSelected] = useState("");
+
+  const isAdmin = Number(selectedStudent) === ADMIN_ID;
+
   useEffect(() => {
     (async () => {
       try {
-        const [sk, int, car] = await Promise.all([
-          getSkills(), getInterests(), getCareers(),
+        const [st, sk, int, car] = await Promise.all([
+          getStudents(), getSkills(), getInterests(), getCareers(),
         ]);
+        setStudents(Array.isArray(st)  ? st  : []);
         setSkills(Array.isArray(sk)  ? sk  : []);
         setInterests(Array.isArray(int) ? int : []);
         setCareers(Array.isArray(car)  ? car  : []);
@@ -55,9 +76,48 @@ function MatchPage() {
   const toggle = (id, list, setter) =>
     setter(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
+  const handleAddStudent = async () => {
+    const name = newStudentName.trim();
+    if (!name) return;
+    try {
+      const created = await createStudent(name);
+      setStudents((prev) => [...prev, created]);
+      setSelectedStudent(String(created.studentId));
+      setNewStudentName("");
+    } catch (e) {
+      alert("Failed to add student: " + e.message);
+    }
+  };
+
+  const handleAddCareer = async () => {
+    const title = newCareerTitle.trim();
+    if (!title) return;
+    try {
+      const created = await createCareer(title, newCareerCategory.trim(), newCareerDesc.trim());
+      setCareers((prev) => [...prev, created]);
+      setNewCareerTitle("");
+      setNewCareerCategory("");
+      setNewCareerDesc("");
+    } catch (e) {
+      alert("Failed to add career: " + e.message);
+    }
+  };
+
+  const handleDeleteCareer = async () => {
+    if (!deleteCareerSelected) return;
+    if (!window.confirm("Delete this career?")) return;
+    try {
+      await deleteCareer(Number(deleteCareerSelected));
+      setCareers((prev) => prev.filter((c) => String(c.careerId) !== deleteCareerSelected));
+      setDeleteCareerSelected("");
+    } catch (e) {
+      alert("Failed to delete career: " + e.message);
+    }
+  };
+
   const handleMatch = async () => {
     setRunning(true);
-    await new Promise((r) => setTimeout(r, 350)); // brief suspense
+    await new Promise((r) => setTimeout(r, 350));
     const ranked = scoreAndRankCareers(
       careers, requirements, skills, interests,
       selectedSkills, selectedInterests, workStyle
@@ -88,6 +148,112 @@ function MatchPage() {
         <div className="error-bar">
           <span>⚠️</span>
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* ── Student Selector ── */}
+      <div className="card">
+        <div className="card-header">
+          <h2><span className="step-badge">0</span>Who are you?</h2>
+        </div>
+        <div className="card-body" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
+          <select
+            value={selectedStudent}
+            onChange={(e) => setSelectedStudent(e.target.value)}
+            style={{ padding: "0.4rem 0.6rem", borderRadius: 6, border: "1px solid var(--ink3)", fontSize: "0.85rem", minWidth: 180 }}
+          >
+            <option value="">— Select a student —</option>
+            {students.map((s) => (
+              <option key={s.studentId} value={s.studentId}>{s.name}</option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            placeholder="New student name…"
+            value={newStudentName}
+            onChange={(e) => setNewStudentName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddStudent()}
+            style={{ padding: "0.4rem 0.6rem", borderRadius: 6, border: "1px solid var(--ink3)", fontSize: "0.85rem", minWidth: 180 }}
+          />
+          <button
+            onClick={handleAddStudent}
+            disabled={!newStudentName.trim()}
+            style={{ padding: "0.4rem 0.9rem", borderRadius: 6, fontSize: "0.85rem", cursor: "pointer" }}
+          >
+            + Add Student
+          </button>
+        </div>
+      </div>
+
+      {/* ── Admin Panel ── */}
+      {isAdmin && (
+        <div className="card" style={{ borderColor: "var(--accent, #e67e22)", borderWidth: 2 }}>
+          <div className="card-header">
+            <h2>🔒 Admin — Manage Careers</h2>
+          </div>
+          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+            {/* Add Career */}
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "0.85rem" }}>Add Career</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                <input
+                  type="text"
+                  placeholder="Title *"
+                  value={newCareerTitle}
+                  onChange={(e) => setNewCareerTitle(e.target.value)}
+                  style={{ padding: "0.4rem 0.6rem", borderRadius: 6, border: "1px solid var(--ink3)", fontSize: "0.85rem", minWidth: 160 }}
+                />
+                <input
+                  type="text"
+                  placeholder="Category"
+                  value={newCareerCategory}
+                  onChange={(e) => setNewCareerCategory(e.target.value)}
+                  style={{ padding: "0.4rem 0.6rem", borderRadius: 6, border: "1px solid var(--ink3)", fontSize: "0.85rem", minWidth: 140 }}
+                />
+                <input
+                  type="text"
+                  placeholder="Description"
+                  value={newCareerDesc}
+                  onChange={(e) => setNewCareerDesc(e.target.value)}
+                  style={{ padding: "0.4rem 0.6rem", borderRadius: 6, border: "1px solid var(--ink3)", fontSize: "0.85rem", minWidth: 200 }}
+                />
+                <button
+                  onClick={handleAddCareer}
+                  disabled={!newCareerTitle.trim()}
+                  style={{ padding: "0.4rem 0.9rem", borderRadius: 6, fontSize: "0.85rem", cursor: "pointer" }}
+                >
+                  + Add Career
+                </button>
+              </div>
+            </div>
+
+            {/* Delete Career */}
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "0.85rem" }}>Delete Career</div>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                <select
+                  value={deleteCareerSelected}
+                  onChange={(e) => setDeleteCareerSelected(e.target.value)}
+                  style={{ padding: "0.4rem 0.6rem", borderRadius: 6, border: "1px solid var(--ink3)", fontSize: "0.85rem", minWidth: 200 }}
+                >
+                  <option value="">— Select career to delete —</option>
+                  {careers.map((c) => (
+                    <option key={c.careerId} value={c.careerId}>{c.title}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleDeleteCareer}
+                  disabled={!deleteCareerSelected}
+                  style={{ padding: "0.4rem 0.9rem", borderRadius: 6, fontSize: "0.85rem", cursor: "pointer", background: "#c0392b", color: "#fff", border: "none" }}
+                >
+                  Delete Career
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 
