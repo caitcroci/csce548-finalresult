@@ -31,9 +31,29 @@ export const createSkill = (skillName) =>
     return res.json();
   });
 
+export const updateSkill = (id, skillName) =>
+  fetch(`${API_BASE}/skills/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skillName }),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
 export const createInterest = (interestName) =>
   fetch(`${API_BASE}/interests`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ interestName }),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
+export const updateInterest = (id, interestName) =>
+  fetch(`${API_BASE}/interests/${id}`, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ interestName }),
   }).then((res) => {
@@ -84,13 +104,8 @@ export const getAllRequirements = async (careers) => {
 };
 
 export const scoreAndRankCareers = (
-  careers,
-  requirements,
-  allSkills,
-  allInterests,
-  selectedSkillIds,
-  selectedInterestIds,
-  workStyle
+  careers, requirements, allSkills, allInterests,
+  selectedSkillIds, selectedInterestIds, workStyle
 ) => {
   const skillNameById    = Object.fromEntries(allSkills.map((s) => [s.skillId, s.skillName]));
   const interestNameById = Object.fromEntries(allInterests.map((i) => [i.interestId, i.interestName]));
@@ -109,15 +124,13 @@ export const scoreAndRankCareers = (
       const haystack = `${career.title} ${career.category}`.toLowerCase();
       allSkills.forEach((skill) => {
         const needle = skill.skillName.toLowerCase();
-        if (needle.length > 2 && haystack.includes(needle.slice(0, Math.min(needle.length, 6)))) {
+        if (needle.length > 2 && haystack.includes(needle.slice(0, Math.min(needle.length, 6))))
           reqs.push({ careerId: career.careerId, skillId: skill.skillId, weight: 2 });
-        }
       });
       allInterests.forEach((interest) => {
         const needle = interest.interestName.toLowerCase();
-        if (needle.length > 2 && haystack.includes(needle.slice(0, Math.min(needle.length, 6)))) {
+        if (needle.length > 2 && haystack.includes(needle.slice(0, Math.min(needle.length, 6))))
           reqs.push({ careerId: career.careerId, interestId: interest.interestId, weight: 1 });
-        }
       });
     });
   }
@@ -126,8 +139,7 @@ export const scoreAndRankCareers = (
     .map((career) => {
       const careerReqs = reqs.filter((r) => r.careerId === career.careerId);
       let score = 0;
-      const matchedSkillNames    = [];
-      const matchedInterestNames = [];
+      const matchedSkillNames = [], matchedInterestNames = [];
 
       careerReqs.forEach((req) => {
         if (req.skillId && selectedSkillIds.includes(req.skillId)) {

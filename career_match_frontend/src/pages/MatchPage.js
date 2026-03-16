@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   getStudents, getSkills, getInterests, getCareers, getAllRequirements,
   scoreAndRankCareers, createStudent, createSkill, createInterest,
-  createCareer, updateCareer, deleteCareer,
+  createCareer, updateCareer, updateSkill, updateInterest, deleteCareer,
 } from "../api";
 import CareerCard from "../components/CareerCard";
 
@@ -25,7 +25,99 @@ const addInputStyle = {
   border: "1px solid var(--ink3)", fontSize: "0.82rem", minWidth: 180,
 };
 
-/* ── Admin career editor sub-component ── */
+/* ── Generic single-field editor (used for both Skills and Interests) ── */
+function AdminNameEditor({ items, idKey, nameKey, onUpdate, updateFn, label }) {
+  const [editingId, setEditingId] = useState(null);
+  const [name,      setName]      = useState("");
+  const [saving,    setSaving]    = useState(false);
+  const [err,       setErr]       = useState(null);
+
+  const startEdit = (item) => {
+    setEditingId(item[idKey]);
+    setName(item[nameKey]);
+    setErr(null);
+  };
+
+  const cancelEdit = () => { setEditingId(null); setErr(null); };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      const updated = await updateFn(editingId, name.trim());
+      onUpdate(updated);
+      setEditingId(null);
+    } catch (e) {
+      setErr("Save failed: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rowStyle = {
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    gap: "0.5rem",
+    alignItems: "center",
+    padding: "0.4rem 0",
+    borderBottom: "1px solid var(--ink3)",
+    fontSize: "0.82rem",
+  };
+
+  const inputStyle = {
+    padding: "0.3rem 0.5rem", borderRadius: 6,
+    border: "1px solid var(--ink3)", fontSize: "0.82rem",
+    width: "100%", boxSizing: "border-box",
+  };
+
+  const btnStyle = (color) => ({
+    padding: "0.3rem 0.7rem", borderRadius: 6, fontSize: "0.78rem",
+    cursor: "pointer", border: "none", background: color,
+    color: "#fff", whiteSpace: "nowrap",
+  });
+
+  if (items.length === 0) {
+    return <p style={{ fontSize: "0.8rem", color: "var(--ink2)" }}>No {label.toLowerCase()}s in database.</p>;
+  }
+
+  return (
+    <div style={{ maxHeight: 260, overflowY: "auto" }}>
+      <div style={{ ...rowStyle, fontWeight: 600, borderBottom: "2px solid var(--ink3)" }}>
+        <span>{label} Name</span>
+        <span></span>
+      </div>
+      {items.map((item) =>
+        editingId === item[idKey] ? (
+          <div key={item[idKey]} style={{ ...rowStyle, background: "var(--surface2, #f8f9fa)", borderRadius: 6, padding: "0.5rem" }}>
+            <input
+              style={inputStyle}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSave()}
+              placeholder={`${label} name *`}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: "0.35rem" }}>
+              <button onClick={handleSave} disabled={saving || !name.trim()} style={btnStyle("#2563eb")}>
+                {saving ? "…" : "Save"}
+              </button>
+              <button onClick={cancelEdit} style={btnStyle("#6b7280")}>Cancel</button>
+              {err && <span style={{ color: "#c0392b", fontSize: "0.7rem" }}>{err}</span>}
+            </div>
+          </div>
+        ) : (
+          <div key={item[idKey]} style={rowStyle}>
+            <span style={{ fontWeight: 500 }}>{item[nameKey]}</span>
+            <button onClick={() => startEdit(item)} style={btnStyle("#2563eb")}>✏️ Edit</button>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ── Admin career editor ── */
 function AdminCareerEditor({ careers, onUpdate }) {
   const [editingId, setEditingId] = useState(null);
   const [title,     setTitle]     = useState("");
@@ -42,10 +134,7 @@ function AdminCareerEditor({ careers, onUpdate }) {
     setErr(null);
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setErr(null);
-  };
+  const cancelEdit = () => { setEditingId(null); setErr(null); };
 
   const handleSave = async () => {
     if (!title.trim()) return;
@@ -73,23 +162,15 @@ function AdminCareerEditor({ careers, onUpdate }) {
   };
 
   const inputStyle = {
-    padding: "0.3rem 0.5rem",
-    borderRadius: 6,
-    border: "1px solid var(--ink3)",
-    fontSize: "0.82rem",
-    width: "100%",
-    boxSizing: "border-box",
+    padding: "0.3rem 0.5rem", borderRadius: 6,
+    border: "1px solid var(--ink3)", fontSize: "0.82rem",
+    width: "100%", boxSizing: "border-box",
   };
 
   const btnStyle = (color) => ({
-    padding: "0.3rem 0.7rem",
-    borderRadius: 6,
-    fontSize: "0.78rem",
-    cursor: "pointer",
-    border: "none",
-    background: color,
-    color: "#fff",
-    whiteSpace: "nowrap",
+    padding: "0.3rem 0.7rem", borderRadius: 6, fontSize: "0.78rem",
+    cursor: "pointer", border: "none", background: color,
+    color: "#fff", whiteSpace: "nowrap",
   });
 
   if (careers.length === 0) {
@@ -98,18 +179,13 @@ function AdminCareerEditor({ careers, onUpdate }) {
 
   return (
     <div style={{ maxHeight: 320, overflowY: "auto" }}>
-      {/* Header row */}
       <div style={{ ...rowStyle, fontWeight: 600, borderBottom: "2px solid var(--ink3)" }}>
-        <span>Title</span>
-        <span>Category</span>
-        <span>Description</span>
-        <span></span>
+        <span>Title</span><span>Category</span><span>Description</span><span></span>
       </div>
-
       {careers.map((career) =>
         editingId === career.careerId ? (
           <div key={career.careerId} style={{ ...rowStyle, background: "var(--surface2, #f8f9fa)", borderRadius: 6, padding: "0.5rem" }}>
-            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title *" />
+            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title *" autoFocus />
             <input style={inputStyle} value={cat}   onChange={(e) => setCat(e.target.value)}   placeholder="Category" />
             <input style={inputStyle} value={desc}  onChange={(e) => setDesc(e.target.value)}  placeholder="Description" />
             <div style={{ display: "flex", gap: "0.35rem", flexDirection: "column" }}>
@@ -126,9 +202,7 @@ function AdminCareerEditor({ careers, onUpdate }) {
             <span style={{ color: "var(--ink2)" }}>{career.category || "—"}</span>
             <span style={{ color: "var(--ink2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {career.description
-                ? career.description.length > 60
-                  ? career.description.slice(0, 60) + "…"
-                  : career.description
+                ? career.description.length > 60 ? career.description.slice(0, 60) + "…" : career.description
                 : "—"}
             </span>
             <button onClick={() => startEdit(career)} style={btnStyle("#2563eb")}>✏️ Edit</button>
@@ -159,20 +233,14 @@ function MatchPage() {
   const [running,  setRunning]  = useState(false);
   const [error,    setError]    = useState(null);
 
-  // Add skill
-  const [newSkillName, setNewSkillName] = useState("");
-  const [addingSkill,  setAddingSkill]  = useState(false);
-
-  // Add interest
+  const [newSkillName,    setNewSkillName]    = useState("");
+  const [addingSkill,     setAddingSkill]     = useState(false);
   const [newInterestName, setNewInterestName] = useState("");
   const [addingInterest,  setAddingInterest]  = useState(false);
 
-  // Admin — add career
   const [newCareerTitle,    setNewCareerTitle]    = useState("");
   const [newCareerCategory, setNewCareerCategory] = useState("");
   const [newCareerDesc,     setNewCareerDesc]     = useState("");
-
-  // Admin — delete career
   const [deleteCareerSelected, setDeleteCareerSelected] = useState("");
 
   const isAdmin = Number(selectedStudent) === ADMIN_ID;
@@ -183,10 +251,10 @@ function MatchPage() {
         const [st, sk, int, car] = await Promise.all([
           getStudents(), getSkills(), getInterests(), getCareers(),
         ]);
-        setStudents(Array.isArray(st)  ? st  : []);
-        setSkills(Array.isArray(sk)    ? sk  : []);
+        setStudents(Array.isArray(st)   ? st  : []);
+        setSkills(Array.isArray(sk)     ? sk  : []);
         setInterests(Array.isArray(int) ? int : []);
-        setCareers(Array.isArray(car)  ? car  : []);
+        setCareers(Array.isArray(car)   ? car : []);
         const reqs = await getAllRequirements(Array.isArray(car) ? car : []);
         setRequirements(reqs);
       } catch (e) {
@@ -265,6 +333,14 @@ function MatchPage() {
     );
   };
 
+  const handleSkillUpdate = (updated) => {
+    setSkills((prev) => prev.map((s) => s.skillId === updated.skillId ? updated : s));
+  };
+
+  const handleInterestUpdate = (updated) => {
+    setInterests((prev) => prev.map((i) => i.interestId === updated.interestId ? updated : i));
+  };
+
   const handleMatch = async () => {
     setRunning(true);
     await new Promise((r) => setTimeout(r, 350));
@@ -294,9 +370,7 @@ function MatchPage() {
         <p>Select what you know and what you love — the algorithm does the rest.</p>
       </div>
 
-      {error && (
-        <div className="error-bar"><span>⚠️</span><span>{error}</span></div>
-      )}
+      {error && <div className="error-bar"><span>⚠️</span><span>{error}</span></div>}
 
       {/* ── Student selector ── */}
       <div className="card">
@@ -331,8 +405,8 @@ function MatchPage() {
       {/* ── Admin panel ── */}
       {isAdmin && (
         <div className="card" style={{ borderColor: "var(--accent, #e67e22)", borderWidth: 2 }}>
-          <div className="card-header"><h2>🔒 Admin — Manage Careers</h2></div>
-          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <div className="card-header"><h2>🔒 Admin — Manage Data</h2></div>
+          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
 
             {/* Add Career */}
             <div>
@@ -374,6 +448,38 @@ function MatchPage() {
                   Delete Career
                 </button>
               </div>
+            </div>
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--ink3)", margin: 0 }} />
+
+            {/* Edit Skill */}
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "0.85rem" }}>Edit Skill</div>
+              <AdminNameEditor
+                items={skills}
+                idKey="skillId"
+                nameKey="skillName"
+                label="Skill"
+                updateFn={(id, name) => updateSkill(id, name)}
+                onUpdate={handleSkillUpdate}
+              />
+            </div>
+
+            {/* Divider */}
+            <hr style={{ border: "none", borderTop: "1px solid var(--ink3)", margin: 0 }} />
+
+            {/* Edit Interest */}
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "0.85rem" }}>Edit Interest</div>
+              <AdminNameEditor
+                items={interests}
+                idKey="interestId"
+                nameKey="interestName"
+                label="Interest"
+                updateFn={(id, name) => updateInterest(id, name)}
+                onUpdate={handleInterestUpdate}
+              />
             </div>
 
           </div>
