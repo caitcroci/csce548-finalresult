@@ -21,9 +21,39 @@ export const createStudent = (name) =>
     return res.json();
   });
 
+export const createSkill = (skillName) =>
+  fetch(`${API_BASE}/skills`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skillName }),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
+export const createInterest = (interestName) =>
+  fetch(`${API_BASE}/interests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ interestName }),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
 export const createCareer = (title, category, description) =>
   fetch(`${API_BASE}/careers`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, category, description }),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+  });
+
+export const updateCareer = (id, title, category, description) =>
+  fetch(`${API_BASE}/careers/${id}`, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, category, description }),
   }).then((res) => {
@@ -48,9 +78,7 @@ export const getAllRequirements = async (careers) => {
       if (Array.isArray(reqs)) {
         reqs.forEach((r) => results.push({ ...r, careerId: career.careerId }));
       }
-    } catch (_) {
-      // endpoint not yet implemented — silently skip
-    }
+    } catch (_) {}
   }
   return results;
 };
@@ -94,7 +122,7 @@ export const scoreAndRankCareers = (
     });
   }
 
-  const ranked = careers
+  return careers
     .map((career) => {
       const careerReqs = reqs.filter((r) => r.careerId === career.careerId);
       let score = 0;
@@ -116,20 +144,11 @@ export const scoreAndRankCareers = (
 
       if (workStyle && styleKeywords[workStyle]) {
         const haystack = `${career.title} ${career.category}`;
-        if (styleKeywords[workStyle].some((kw) => haystack.includes(kw))) {
-          score += 1;
-        }
+        if (styleKeywords[workStyle].some((kw) => haystack.includes(kw))) score += 1;
       }
 
-      return {
-        ...career,
-        score,
-        matchedSkills:    matchedSkillNames,
-        matchedInterests: matchedInterestNames,
-      };
+      return { ...career, score, matchedSkills: matchedSkillNames, matchedInterests: matchedInterestNames };
     })
     .filter((c) => c.score > 0)
     .sort((a, b) => b.score - a.score);
-
-  return ranked;
 };
